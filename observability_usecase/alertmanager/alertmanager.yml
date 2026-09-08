@@ -1,0 +1,18 @@
+global:
+  smtp_smarthost: 'smtp.office365.com:587'
+  smtp_from: 'subratpal3187@outlook.com'
+  smtp_auth_username: 'subratpal3187@outlook.com'
+  smtp_auth_password: 'ucscolfqmcxemmhz'
+  smtp_require_tls: true
+
+route:
+  receiver: outlook-email
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1m
+
+receivers:
+  - name: outlook-email
+    email_configs:
+      - to: 'subhabratapal31@gmail.com'
+        send_resolved: true

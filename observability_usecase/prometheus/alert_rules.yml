@@ -1,0 +1,30 @@
+groups:
+
+- name: application_alerts
+
+  rules:
+
+  - alert: HighMemoryUsage
+
+    expr: memory_usage_percent > 80
+
+    for: 1m
+
+    labels:
+      severity: critical
+
+    annotations:
+      summary: "Memory usage is above 80%"
+
+  - alert: HighHTTP500Rate
+
+    expr: |
+      rate(http_requests_total{status="500"}[1m]) > 1
+
+    for: 30s
+
+    labels:
+      severity: warning
+
+    annotations:
+      summary: "Too many HTTP 500 errors"
