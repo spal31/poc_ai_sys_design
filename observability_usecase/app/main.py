@@ -1,42 +1,13 @@
 from fastapi import FastAPI
-from prometheus_client import generate_latest
-from fastapi.responses import Response
+from routes import router
+from telemetry import setup_telemetry
+from logger_setup import configure_logging
 
-import time
-import random
 
-from metrics import *
-from tracing import *
+configure_logging()
 
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+app = FastAPI(title="Payment Service")
 
-app = FastAPI()
+setup_telemetry(app)
 
-FastAPIInstrumentor.instrument_app(app)
-
-@app.get("/metrics")
-def metrics():
-    update_memory()
-    return Response(generate_latest(),
-                    media_type="text/plain")
-
-@app.get("/payment")
-def payment():
-
-    start = time.time()
-
-    # simulate work
-    time.sleep(random.uniform(0.1,0.5))
-
-    if random.randint(1,2)==2:
-        network_errors.inc()
-        http_requests.labels("GET","/payment","500").inc()
-        return {"status":"error"}
-
-    latency=time.time()-start
-
-    http_latency.labels("/payment").observe(latency)
-
-    http_requests.labels("GET","/payment","200").inc()
-
-    return {"status":"success"}
+app.include_router(router)

@@ -1,30 +1,43 @@
 groups:
 
-- name: application_alerts
+- name: payment-alerts
 
   rules:
 
-  - alert: HighMemoryUsage
+  - alert: HighLatency
 
-    expr: memory_usage_percent > 80
+    expr: histogram_quantile(
+            0.95,
+            rate(http_server_request_duration_bucket[5m])
+          ) > 1
 
-    for: 1m
+    for: 2m
 
     labels:
       severity: critical
 
     annotations:
-      summary: "Memory usage is above 80%"
+      summary: "95 percentile latency above 1 second"
 
-  - alert: HighHTTP500Rate
 
-    expr: |
-      rate(http_requests_total{status="500"}[1m]) > 1
+  - alert: HighErrorRate
 
-    for: 30s
+    expr: rate(http_server_request_count{http_status_code="500"}[5m]) > 2
+
+    for: 1m
 
     labels:
       severity: warning
 
     annotations:
       summary: "Too many HTTP 500 errors"
+
+
+  - alert: HighRAM
+
+    expr: system_ram_usage_mb > 900
+
+    for: 5m
+
+    labels:
+      severity: critical
