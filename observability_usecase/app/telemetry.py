@@ -18,13 +18,11 @@ from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExp
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 
-
 resource = Resource.create({
     "service.name": "payment-service",
     "service.version": "1.0"
 })
 
-# ---------- Metrics ----------
 metric_reader = PeriodicExportingMetricReader(
     OTLPMetricExporter(
         endpoint="http://otel-collector:4317",
@@ -70,7 +68,6 @@ meter.create_observable_gauge(
     callbacks=[ram_callback]
 )
 
-# ---------- Setup Function ----------
 def setup_telemetry(app: FastAPI):
 
     tracer_provider = TracerProvider(resource=resource)
