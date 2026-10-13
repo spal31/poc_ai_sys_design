@@ -47,7 +47,7 @@ def generate_payment_event() -> dict:
 
         "amount": str(
             Decimal(
-                random.randint(100, 100000)
+                random.randint(-50, 1000)
             )
         ),
 

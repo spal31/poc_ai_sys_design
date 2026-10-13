@@ -37,5 +37,15 @@ services:
     volumes:
       - ./kafka:/opt/kafka/scripts
 
+  redis:
+    image: redis:7-alpine
+    container_name: fraud-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
 volumes:
   kafka-data:
+  redis_data:

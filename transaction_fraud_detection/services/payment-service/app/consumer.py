@@ -4,6 +4,13 @@ from kafka import KafkaConsumer
 
 from service import PaymentService
 
+from shared.logging_config import configure_logging
+
+import logging 
+configure_logging("payment-service")
+logger = logging.getLogger("payment")
+
+
 
 TOPIC = "payment-events"
 
@@ -41,12 +48,19 @@ for message in consumer:
     try:
 
         payment = message.value
+        payment_id = payment.get("payment_id")
+        correlation_id = payment.get("correlation_id")
 
-        print(
-            f"[PAYMENT CONSUMER] "
-            f"partition={message.partition} "
-            f"offset={message.offset}"
-        )
+               
+        logger.info(f"[PAYMENT CONSUMER] "
+                                   f"partition={message.partition} "
+                                   f"offset={message.offset}",
+                       extra={
+                           "event": "payment_message_consumed",
+                           "payment_id": payment_id,
+                           "correlation_id": correlation_id,
+                       },
+                      )
 
         payment_service.process(payment)
 
@@ -59,6 +73,10 @@ for message in consumer:
             f"Payment processing failed: {exc}"
         )
 
-        # Do NOT commit.
-        #
-        # The message can be processed again.
+        logger.exception( f"Payment processing failed: {exc}",
+                               extra={
+                                   "event": "payment_message_consume_failed",
+                                   "payment_id": payment_id,
+                                   "correlation_id": correlation_id,
+                               },
+                              )

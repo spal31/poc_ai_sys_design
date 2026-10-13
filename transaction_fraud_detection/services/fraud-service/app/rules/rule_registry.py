@@ -3,9 +3,10 @@ from rule_manager import RuleManager
 from rules.high_amount import HighAmountRule
 from rules.velocity import VelocityRule
 from rules.new_country import NewCountryRule
-
+from redis_state import RedisState
 
 def create_rule_manager() -> RuleManager:
+    redis_state = RedisState()
 
     manager = RuleManager()
 
@@ -16,14 +17,11 @@ def create_rule_manager() -> RuleManager:
     )
 
     manager.register(
-        VelocityRule(
-            window_seconds=60,
-            max_transactions=5,
-        )
+        VelocityRule(redis_state=redis_state)
     )
 
     manager.register(
-        NewCountryRule()
+        NewCountryRule(redis_state=redis_state)
     )
 
     return manager
