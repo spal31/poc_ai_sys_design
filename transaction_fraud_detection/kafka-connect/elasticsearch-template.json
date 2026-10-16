@@ -1,0 +1,42 @@
+{
+  "index_patterns": [
+    "payment-audit*"
+  ],
+
+  "template": {
+
+    "mappings": {
+
+      "properties": {
+
+        "event_type": {
+          "type": "keyword"
+        },
+
+        "transaction_id": {
+          "type": "keyword"
+        },
+
+        "customer_id": {
+          "type": "keyword"
+        },
+
+        "amount": {
+          "type": "double"
+        },
+
+        "country": {
+          "type": "keyword"
+        },
+
+        "decision": {
+          "type": "keyword"
+        },
+
+        "fraud_score": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

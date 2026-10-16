@@ -12,7 +12,7 @@ def create_rule_manager() -> RuleManager:
 
     manager.register(
         HighAmountRule(
-            threshold=50_000
+            threshold=500
         )
     )
 

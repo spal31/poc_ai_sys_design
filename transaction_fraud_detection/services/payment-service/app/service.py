@@ -8,7 +8,7 @@ from shared.events.payment_result import (
 )
 
 from shared.events.audit_event import (
-    create_audit_event
+    create_payment_audit_event
 )
 
 
@@ -17,9 +17,13 @@ from shared.logging_config import configure_logging
 configure_logging("payment-service")
 logger = logging.getLogger("payment")
 
+from validation import Validation
 
-RESULT_TOPIC = "payment-results"
-AUDIT_TOPIC = "payment-audit"
+from shared.config import (
+    KAFKA_BOOTSTRAP_SERVERS,
+    PAYMENT_AUDIT_TOPIC,
+    PAYMENT_RESULTS_TOPIC
+)
 
 
 class PaymentService:
@@ -27,7 +31,7 @@ class PaymentService:
     def __init__(self):
 
         self.producer = KafkaProducer(
-            bootstrap_servers="localhost:9092",
+            bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
 
             value_serializer=lambda value:
                 json.dumps(value).encode("utf-8"),
@@ -37,6 +41,38 @@ class PaymentService:
 
             acks="all",
         )
+
+    def publish_payment_result(self, payment: dict, success: bool):
+    
+            result = create_payment_result(
+                                payment=payment,
+                                status="APPROVED" if success else "FAILED",
+                            )
+            
+            self.producer.send(
+                    PAYMENT_RESULTS_TOPIC,
+                    key=payment["customer_id"],
+                    value=result,
+                )
+    
+            audit = create_payment_audit_event(
+                    event_type="PAYMENT_PROCESSED",
+    
+                    payment=payment,
+    
+                    details={
+                        "status": "APPROVED" if success else "FAILED",
+                        "service": "payment-service",
+                    },
+                )
+    
+            self.producer.send(
+                    PAYMENT_AUDIT_TOPIC,
+                    key=json.dumps(payment["customer_id"]),
+                    value=audit,
+                )
+    
+            self.producer.flush()
 
     def process(self, payment: dict):
 
@@ -51,33 +87,14 @@ class PaymentService:
                    "correlation_id": correlation_id,
                },
               )
-       
-       result = create_payment_result(
-            payment=payment,
-            status="APPROVED",
-        )
+       try: 
+            validation = Validation()
+            validation.validate(payment)
+            
+            self.publish_payment_result(payment, True)
 
-       self.producer.send(
-            RESULT_TOPIC,
-            key=payment["customer_id"],
-            value=result,
-        )
+       except Exception as exc:
 
-       audit = create_audit_event(
-            event_type="PAYMENT_PROCESSED",
+            self.publish_payment_result(payment, False)
 
-            payment=payment,
-
-            details={
-                "status": "APPROVED",
-                "service": "payment-service",
-            },
-        )
-
-       self.producer.send(
-            AUDIT_TOPIC,
-            key=payment["customer_id"],
-            value=audit,
-        )
-
-       self.producer.flush()
+            raise

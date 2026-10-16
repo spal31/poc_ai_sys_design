@@ -7,26 +7,23 @@ from shared.events.fraud_alert import (
 )
 
 from shared.events.audit_event import (
-    create_audit_event
+    create_fraud_audit_event
 )
 
-from errors.exceptions import (
+from shared.errors.exceptions import (
     TransientProcessingError
 )
 
-from validation import Validation
-
 from shared.logging_config import configure_logging
 
+from shared.config import (
+    KAFKA_BOOTSTRAP_SERVERS,
+    FRAUD_ALERTS_TOPIC,
+    PAYMENT_AUDIT_TOPIC
+)
 import logging 
 configure_logging("fraud-service")
 logger = logging.getLogger("fraud")
-
-
-FRAUD_TOPIC = "fraud-alerts"
-
-AUDIT_TOPIC = "payment-audit"
-
 
 class FraudService:
 
@@ -34,7 +31,7 @@ class FraudService:
 
         self.producer = KafkaProducer(
 
-            bootstrap_servers="localhost:9092",
+            bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
 
             value_serializer=lambda value:
                 json.dumps(value).encode("utf-8"),
@@ -48,21 +45,17 @@ class FraudService:
 
     def process(self, payment: dict):
 
-        payment_id = payment.get("payment_id")
-        correlation_id = payment.get("correlation_id")
+        payment_id = payment.get("transaction_id")
         
                        
         logger.info(f"[FRAUD] Checking "
                     f"{payment['transaction_id']}",
                                extra={
                                    "event": "fraud_checking",
-                                   "payment_id": payment_id,
-                                   "correlation_id": correlation_id,
+                                   "payment_id": payment_id
                                },
                               )
         
-        validation = Validation()
-        validation.validate(payment)
         
         try:
           rule_results = self.rule_manager.evaluate(
@@ -107,14 +100,13 @@ class FraudService:
 
         if fraud:
 
-            logger.info( f"[FRAUD] "
+            logger.info( f"[FRAUD] Detected "
                                f"transaction={payment['transaction_id']} "
                                f"risk_score={risk_score} "
                                f"rules={triggered_rules}",
                                            extra={
                                                "event": "fraud_detected",
-                                               "payment_id": payment_id,
-                                               "correlation_id": correlation_id,
+                                               "payment_id": payment_id
                                            },
                                           )
             
@@ -124,38 +116,36 @@ class FraudService:
             )
 
             self.producer.send(
-                FRAUD_TOPIC,
+                FRAUD_ALERTS_TOPIC,
 
                 key=payment["customer_id"],
 
                 value=alert,
             )
 
-        audit = create_audit_event(
+            audit = create_fraud_audit_event(
 
-            event_type="FRAUD_CHECK",
+                event_type="PAYMENT_FRAUD_AUDIT",
 
-            payment=payment,
+                payment=payment,
 
-            details={
-                "risk_score": risk_score,
+                details={
+                    "risk_score": risk_score,
 
-                "fraud": fraud,
+                    "fraud": fraud,
 
-                "rules_triggered":
-                    triggered_rules,
+                    "rules_triggered":
+                        triggered_rules,
 
-                "service":
-                    "fraud-service",
-            },
-        )
+                    "service":
+                        "fraud-service",
+                },
+            )
+        
 
-        self.producer.send(
-            AUDIT_TOPIC,
+            self.producer.send(
+                PAYMENT_AUDIT_TOPIC,
+                key=json.dumps(payment["customer_id"]),
+                value=audit)
 
-            key=payment["customer_id"],
-
-            value=audit,
-        )
-
-        self.producer.flush()
+            self.producer.flush()

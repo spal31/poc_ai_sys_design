@@ -3,9 +3,10 @@ from datetime import datetime, timezone
 
 from kafka import KafkaProducer
 
-from app.config import (
+from shared.config import (
     KAFKA_BOOTSTRAP_SERVERS,
-    FRAUD_DLQ_TOPIC
+    PAYMENT_DLQ_TOPIC,
+    PAYMENT_CONSUMER_GROUP
 )
 
 
@@ -40,7 +41,7 @@ class DLQProducer:
                 "source_topic": source_topic,
                 "source_partition": source_partition,
                 "source_offset": source_offset,
-                "consumer_group": "cg-fraud-service",
+                "consumer_group": PAYMENT_CONSUMER_GROUP,
                 "retry_count": retry_count,
                 "failed_at": datetime.now(
                     timezone.utc
@@ -54,7 +55,7 @@ class DLQProducer:
         )
 
         self.producer.send(
-            topic=FRAUD_DLQ_TOPIC,
+            topic=PAYMENT_DLQ_TOPIC,
             key=transaction_id.encode('utf-8') if transaction_id else None, 
             value=dlq_event
         )

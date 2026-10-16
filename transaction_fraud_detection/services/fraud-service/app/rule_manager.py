@@ -41,8 +41,6 @@ class RuleManager:
 
         return list(self._rules.keys())
 
-    FRAUD_THRESHOLD = 40
-
 
     def is_fraudulent(self, rule_results: list[dict]) -> bool:
 

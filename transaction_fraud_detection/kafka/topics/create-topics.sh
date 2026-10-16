@@ -35,6 +35,7 @@ create_topic "payment-events" 3
 create_topic "payment-results" 3
 create_topic "fraud-alerts" 3
 create_topic "payment-audit" 3
+create_topic "payment-dlq" 3
 
 echo ""
 echo "======================================"

@@ -1,5 +1,5 @@
 import redis
-from app.config import REDIS_HOST, REDIS_PORT, REDIS_DB
+from shared.config import REDIS_HOST, REDIS_PORT, REDIS_DB
 
 class RedisState:
 

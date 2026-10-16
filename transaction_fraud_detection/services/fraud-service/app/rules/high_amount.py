@@ -3,7 +3,7 @@ from rules.base import FraudRule, RuleResult
 
 class HighAmountRule(FraudRule):
 
-    def __init__(self, threshold: float = 50_000):
+    def __init__(self, threshold: float = 500):
         self.threshold = threshold
 
     @property

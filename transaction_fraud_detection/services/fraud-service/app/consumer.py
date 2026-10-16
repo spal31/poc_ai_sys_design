@@ -2,19 +2,13 @@ import json
 
 from kafka import KafkaConsumer
 
-from config import (
+from shared.config import (
     KAFKA_BOOTSTRAP_SERVERS,
     PAYMENT_EVENTS_TOPIC,
     FRAUD_CONSUMER_GROUP
 )
 
-from errors.exceptions import (
-    PermanentProcessingError,
-    TransientProcessingError
-)
-
-from errors.fraud_dlq import DLQProducer
-from errors.retry import execute_with_retry
+from shared.errors.retry import execute_with_retry
 
 from shared.logging_config import configure_logging
 
@@ -36,14 +30,12 @@ class FraudConsumer:
          )
 
         self.fraud_service = fraud_service
-        self.dlq_producer = DLQProducer()
 
     def run(self):
-        print("Fraud consumer started...")
+        logger.info("Fraud consumer started !!")
 
         while True:
-            # kafka-python poll() returns a dict: {TopicPartition: [ConsumerRecord, ...]}
-            # timeout_ms is used instead of seconds
+            
             records_dict = self.consumer.poll(timeout_ms=1000)
 
             if not records_dict:
@@ -55,7 +47,6 @@ class FraudConsumer:
                     
                     # Initialize payment as an empty dict to ensure it's in scope for exceptions
                     payment = {}
-                    retry_count = 0
 
                     try:
                         
@@ -77,38 +68,14 @@ class FraudConsumer:
 
                         print(f"Fraud processing successful: {result}")
                         logger.info(f"Fraud processing successful: {result}",
-                                                                               extra={
-                                                                                   "event": "fraud_checking",
-                                                                                   "payment_id": payment_id,
-                                                                                   "correlation_id": correlation_id,
-                                                                               },
-                                                                              )
+                                                extra={
+                                                    "event": "fraud_checking",
+                                                    "payment_id": payment_id,
+                                                    "correlation_id": correlation_id,
+                                                },
+                                                )
 
                         # kafka-python commit is synchronous by default, no message/asynchronous arguments needed
-                        self.consumer.commit()
-
-                    except PermanentProcessingError as exc:
-                        logger.exception(f"Permanent error: {exc}",
-                                     extra={ "event": "fraud_checking",
-                                              "payment_id": payment_id,
-                                               "correlation_id": correlation_id,})
-                        self.send_to_dlq(msg, payment, exc, retry_count=0)
-                        self.consumer.commit()
-
-                    except TransientProcessingError as exc:
-                        logger.exception(f"Retries exhausted: {exc}",
-                                                             extra={ "event": "fraud_checking",
-                                                                      "payment_id": payment_id,
-                                                                       "correlation_id": correlation_id,})
-                        self.send_to_dlq(msg, payment, exc, retry_count=retry_count)
-                        self.consumer.commit()
-
-                    except json.JSONDecodeError as exc:
-                        logger.exception(f"Invalid JSON: {exc}",
-                                                             extra={ "event": "fraud_checking",
-                                                                      "payment_id": payment_id,
-                                                                       "correlation_id": correlation_id,})
-                        self.send_to_dlq(msg, {}, exc, retry_count=0)
                         self.consumer.commit()
 
                     except Exception as exc:
@@ -116,23 +83,5 @@ class FraudConsumer:
                                                              extra={ "event": "fraud_checking",
                                                                       "payment_id": payment_id,
                                                                        "correlation_id": correlation_id,})
-                        self.send_to_dlq(msg, payment, exc, retry_count=0)
                         self.consumer.commit()
-
-    def send_to_dlq(
-        self,
-        msg,
-        payment,
-        error,
-        retry_count
-    ):
-
-        self.dlq_producer.send(
-            original_event=payment,
-            error=error,
-            source_topic=msg.topic,
-            source_partition=msg.partition,
-            source_offset=msg.offset,
-            retry_count=retry_count
-        )
 

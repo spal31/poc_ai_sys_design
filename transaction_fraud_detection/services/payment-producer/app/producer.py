@@ -8,9 +8,10 @@ from decimal import Decimal
 
 from kafka import KafkaProducer
 
-
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
-TOPIC = "payment-events"
+from shared.config import (
+    KAFKA_BOOTSTRAP_SERVERS,
+    PAYMENT_EVENTS_TOPIC
+)
 
 
 producer = KafkaProducer(
@@ -47,7 +48,7 @@ def generate_payment_event() -> dict:
 
         "amount": str(
             Decimal(
-                random.randint(-50, 1000)
+                random.randint(-500, 2000)
             )
         ),
 
@@ -68,6 +69,7 @@ def generate_payment_event() -> dict:
                 "IN",
                 "US",
                 "GB",
+                "CA"
             ]),
 
         "ip_address":
@@ -93,7 +95,7 @@ def send_payment():
     transaction_id = event["transaction_id"]
 
     future = producer.send(
-        TOPIC,
+        PAYMENT_EVENTS_TOPIC,
 
         key=customer_id,
 

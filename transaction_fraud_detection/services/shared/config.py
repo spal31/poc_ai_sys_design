@@ -16,14 +16,29 @@ PAYMENT_EVENTS_TOPIC = os.getenv(
     "payment-events"
 )
 
+PAYMENT_AUDIT_TOPIC = os.getenv(
+    "PAYMENT_AUDIT_TOPIC",
+    "payment-audit"
+)
+
+PAYMENT_RESULTS_TOPIC = os.getenv(
+    "PAYMENT_RESULTS_TOPIC",
+    "payment-results"
+)
+
+PAYMENT_CONSUMER_GROUP = os.getenv(
+    "PAYMENT_CONSUMER_GROUP",
+    "cg-payment-service"
+)
+
 FRAUD_ALERTS_TOPIC = os.getenv(
     "FRAUD_ALERTS_TOPIC",
     "fraud-alerts"
 )
 
-FRAUD_DLQ_TOPIC = os.getenv(
-    "FRAUD_DLQ_TOPIC",
-    "fraud-dlq"
+PAYMENT_DLQ_TOPIC = os.getenv(
+    "PAYMENT_DLQ_TOPIC",
+    "payment-dlq"
 )
 
 FRAUD_CONSUMER_GROUP = os.getenv(

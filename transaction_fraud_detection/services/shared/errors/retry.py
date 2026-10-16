@@ -1,7 +1,6 @@
 import time
 
-from config import MAX_RETRIES
-from errors.exceptions import TransientProcessingError
+from shared.errors.exceptions import TransientProcessingError
 
 
 def execute_with_retry(process_function):
@@ -19,13 +18,13 @@ def execute_with_retry(process_function):
 
             retry_count += 1
 
-            if retry_count > MAX_RETRIES:
+            if retry_count > 3:
                 raise
 
             sleep_seconds = 2 ** (retry_count - 1)
 
             print(
-                f"Retry {retry_count}/{MAX_RETRIES} "
+                f"Retry {retry_count}/{3} "
                 f"after {sleep_seconds}s"
             )
 

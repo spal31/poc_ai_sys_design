@@ -6,77 +6,125 @@ from service import PaymentService
 
 from shared.logging_config import configure_logging
 
+from payment_dlq import DLQProducer
+
+from shared.errors.retry import execute_with_retry
+
 import logging 
 configure_logging("payment-service")
 logger = logging.getLogger("payment")
 
+from shared.config import (
+    KAFKA_BOOTSTRAP_SERVERS,
+    PAYMENT_EVENTS_TOPIC,
+    PAYMENT_CONSUMER_GROUP
+)
 
-
-TOPIC = "payment-events"
-
-GROUP_ID = "cg-payment-service"
-
-
-consumer = KafkaConsumer(
-
-    TOPIC,
-
-    bootstrap_servers="localhost:9092",
-
-    group_id=GROUP_ID,
-
-    auto_offset_reset="earliest",
-
-    enable_auto_commit=False,
-
-    value_deserializer=lambda value:
-        json.loads(value.decode("utf-8")),
+from shared.errors.exceptions import (
+    PermanentProcessingError,
+    TransientProcessingError
 )
 
 
-payment_service = PaymentService()
+class PaymentConsumer:
 
+    def __init__(self):
 
-print(
-    f"Payment Service started. "
-    f"Consumer group={GROUP_ID}"
-)
+        self.consumer = KafkaConsumer(
+          PAYMENT_EVENTS_TOPIC,
+          bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+          group_id=PAYMENT_CONSUMER_GROUP,
+          auto_offset_reset="earliest",
+          enable_auto_commit=False,
+          value_deserializer=lambda value: json.loads(value.decode("utf-8")),
+         )
 
+        self.payment_service = PaymentService()
+        self.dlq_producer = DLQProducer()
 
-for message in consumer:
+    def run(self):
+        logger.info("Payment consumer started !!")
 
-    try:
+        while True:
+            # kafka-python poll() returns a dict: {TopicPartition: [ConsumerRecord, ...]}
+            # timeout_ms is used instead of seconds
+            records_dict = self.consumer.poll(timeout_ms=1000)
 
-        payment = message.value
-        payment_id = payment.get("payment_id")
-        correlation_id = payment.get("correlation_id")
+            if not records_dict:
+                continue
 
+            # Iterate through the partitions and records
+            for topic_partition, records in records_dict.items():
+
+                for message in records:
+
+                    retry_count = 0
+                    try:
+                        payment = message.value
+                        payment_id = payment.get("transaction_id")
                
-        logger.info(f"[PAYMENT CONSUMER] "
+                        logger.info(f"PAYMENT CONSUMED"
                                    f"partition={message.partition} "
                                    f"offset={message.offset}",
-                       extra={
-                           "event": "payment_message_consumed",
-                           "payment_id": payment_id,
-                           "correlation_id": correlation_id,
-                       },
-                      )
+                                    extra={ 
+                                        "event": "payment_message_consumed",
+                                        "payment_id": payment_id})
 
-        payment_service.process(payment)
+                        result, retry_count = execute_with_retry(lambda: self.payment_service.process(payment))
 
-        # Commit only after successful processing.
-        consumer.commit()
+                        logger.info(f"PAYMENT CONSUMED SUCCESSFULLY PROCESSED "
+                                    f"partition={message.partition} "
+                                    f"offset={message.offset}",
+                                    extra={
+                                        "event": "payment_message_processed",
+                                        "payment_id": payment_id})
 
-    except Exception as exc:
+                        self.consumer.commit()
 
-        print(
-            f"Payment processing failed: {exc}"
+                    except PermanentProcessingError as exc:
+                        logger.exception(f"Permanent error: {exc}",
+                                        extra={ "event": "fraud_checking",
+                                                "payment_id": payment_id,
+                                                })
+                        self.send_to_dlq(message, payment, exc, retry_count)
+                        self.consumer.commit()
+                    
+                    except TransientProcessingError as exc:
+                        logger.exception(f"Retries exhausted: {exc}",
+                                                                extra={ "event": "fraud_checking",
+                                                                        "payment_id": payment_id})
+                        self.send_to_dlq(message, payment, exc, retry_count=retry_count)
+                        self.consumer.commit()
+                    
+                    except json.JSONDecodeError as exc:
+                        logger.exception(f"Invalid JSON: {exc}",
+                                                                extra={ "event": "fraud_checking",
+                                                                        "payment_id": payment_id})
+                        self.send_to_dlq(message, {}, exc, retry_count=0)
+                        self.consumer.commit()
+                    
+                    except Exception as exc:
+                        logger.exception(f"Unexpected error: {exc}",
+                                                                extra={ "event": "fraud_checking",
+                                                                        "payment_id": payment_id})
+                        self.send_to_dlq(message, payment, exc, retry_count=0)
+                        self.consumer.commit()
+    
+    def send_to_dlq(
+        self,
+        msg,
+        payment,
+        error,
+        retry_count
+    ):
+
+        self.dlq_producer.send(
+            original_event=payment,
+            error=error,
+            source_topic=msg.topic,
+            source_partition=msg.partition,
+            source_offset=msg.offset,
+            retry_count=retry_count
         )
 
-        logger.exception( f"Payment processing failed: {exc}",
-                               extra={
-                                   "event": "payment_message_consume_failed",
-                                   "payment_id": payment_id,
-                                   "correlation_id": correlation_id,
-                               },
-                              )
+    
