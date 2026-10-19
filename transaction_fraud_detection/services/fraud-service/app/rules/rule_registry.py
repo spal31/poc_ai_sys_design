@@ -3,7 +3,7 @@ from rule_manager import RuleManager
 from rules.high_amount import HighAmountRule
 from rules.velocity import VelocityRule
 from rules.new_country import NewCountryRule
-from redis_state import RedisState
+from shared.redis_state.redis_fraud_state import RedisState
 
 def create_rule_manager() -> RuleManager:
     redis_state = RedisState()

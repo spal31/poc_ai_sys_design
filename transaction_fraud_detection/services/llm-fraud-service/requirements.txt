@@ -1,0 +1,10 @@
+
+deepagents
+langgraph
+langchain
+langchain-openai
+langfuse
+pydantic>=2.7,<3
+pydantic-settings>=2.2,<3
+confluent-kafka
+pytest

@@ -1,7 +1,7 @@
 import json
 
 from kafka import KafkaProducer
-from redis_state import RedisState
+from shared.redis_state.redis_fraud_state import RedisState
 from shared.events.fraud_alert import (
     create_fraud_alert
 )
@@ -19,9 +19,14 @@ from shared.logging_config import configure_logging
 from shared.config import (
     KAFKA_BOOTSTRAP_SERVERS,
     FRAUD_ALERTS_TOPIC,
-    PAYMENT_AUDIT_TOPIC
+    PAYMENT_AUDIT_TOPIC,
+    LLM_REVIEW_TOPIC
 )
+
+from llm_router import LLMRoutingResult
+
 import logging 
+
 configure_logging("fraud-service")
 logger = logging.getLogger("fraud")
 
@@ -97,6 +102,31 @@ class FraudService:
             for rule in rule_results
             if rule.triggered
         ]
+
+        # Check if further LLM review required
+        llm_routing_result = LLMRoutingResult()
+        routing = llm_routing_result.should_route_to_llm(
+                    risk_score=risk_score,
+                    triggered_rules=triggered_rules )
+        
+        if routing.required:
+
+            llm_routing_result = {
+                    "transaction_id": payment["transaction_id"],
+                    "risk_score": risk_score,
+                    "triggered_rules": triggered_rules,
+                    "llm_review_required": routing.required,
+                    "llm_routing_reason": routing.reason,
+                    "customer_id": payment["customer_id"]
+            }
+
+            self.producer.send(
+                    LLM_REVIEW_TOPIC,
+    
+                    key=payment["transaction_id"],
+    
+                    value=llm_routing_result,
+                )
 
         if fraud:
 
