@@ -1,5 +1,5 @@
 
-from app.schemas import FraudAssessment
+from schemas import FraudAssessment
 
 
 def make_policy_decision(assessment: FraudAssessment) -> dict:

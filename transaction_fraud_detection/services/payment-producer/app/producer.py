@@ -37,7 +37,7 @@ def generate_payment_event() -> dict:
 
     transaction_id = str(uuid.uuid4())
 
-    customer_id = f"customer-{random.randint(1, 10)}"
+    customer_id = f"CUST-{random.randint(1, 5)}"
 
     event = {
         "event_id": str(uuid.uuid4()),

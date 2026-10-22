@@ -24,7 +24,7 @@ class RedisCustomerContext:
 
     @staticmethod
     def transactions_key(customer_id: str) -> str:
-        return f"customer:{customer_id}:transactions"
+        return f"customer:{customer_id}:transactions:llm"
 
     def save_customer_profile(
         self,
@@ -129,18 +129,6 @@ class RedisCustomerContext:
             "recent_transactions": transactions,
             "history_available": bool(transactions)
         }
-
-    def get_customer_profile(
-                self,
-                customer_id: str,
-            ) -> dict[str, Any]:
-                """Fetch customer required by the agent."""
-                profile = self.get_customer_profile(customer_id)
-        
-                return {
-                    "customer_profile": profile,
-                    "profile_available": profile is not None,
-                }
     
 
     def health_check(self) -> bool:

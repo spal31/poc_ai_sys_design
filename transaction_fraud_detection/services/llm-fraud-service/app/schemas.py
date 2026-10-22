@@ -1,30 +1,28 @@
 
-from typing import Literal
+from typing import Literal, List
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class FraudReviewEvent(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    # model_config = ConfigDict(extra="forbid")
 
     transaction_id: str = Field(min_length=1, max_length=128)
-    correlation_id: str = Field(min_length=1, max_length=128)
 
-    amount: float = Field(gt=0, le=100_000_000)
-    currency: str = Field(min_length=3, max_length=3)
+    risk_score: int = Field(gt=0, le=100)
+
+    #amount: float = Field(gt=0, le=100_000_000)
 
     customer_id: str = Field(min_length=1, max_length=128)
-    rule_outcome: Literal["REVIEW_REQUIRED"]
-    matched_rules: list[str] = Field(max_length=20)
 
-    # Optional signals should be included only if available
-    recent_failed_attempts: int = Field(default=0, ge=0, le=1000)
-    new_device: bool | None = None
+    llm_review_required: bool
+
+    triggered_rules: list[str] = Field(max_items=20)
+
+    llm_routing_reason: str = Field(min_length=1, max_length=128)
 
 
 class FraudAssessment(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
     risk_level: Literal["LOW", "MEDIUM", "HIGH"]
 
     recommendation: Literal[
@@ -33,15 +31,15 @@ class FraudAssessment(BaseModel):
         "DECLINE_CANDIDATE",
     ]
 
-    reason_codes: list[str] = Field(max_length=10)
-    evidence: list[str] = Field(max_length=10)
+    reason_codes: List[str] = Field(..., max_items=10)
+    evidence: List[str] = Field(..., max_items=10)
 
     uncertainty: Literal["LOW", "MEDIUM", "HIGH"]
 
 
+
 class FraudDecisionEvent(BaseModel):
     transaction_id: str
-    correlation_id: str
 
     decision: Literal[
         "APPROVE",

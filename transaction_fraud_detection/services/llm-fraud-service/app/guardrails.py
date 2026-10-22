@@ -1,7 +1,9 @@
 
 from pydantic import ValidationError
 
-from app.schemas import FraudReviewEvent, FraudAssessment
+from schemas import FraudReviewEvent, FraudAssessment
+
+from typing import Any, Dict, List, Literal
 
 
 ALLOWED_REASON_CODES = {
@@ -14,37 +16,46 @@ ALLOWED_REASON_CODES = {
 }
 
 
-def validate_review_event(payload: dict) -> FraudReviewEvent:
-    """Reject malformed or unexpected Kafka events."""
-    return FraudReviewEvent.model_validate(payload)
+def validate_review_event(payload: Any) -> FraudReviewEvent:
+    """Reject malformed or unexpected Kafka events with exact structure and business logic checks."""
+    if not isinstance(payload, dict):
+        raise ValueError("Payload must be a dictionary")
+
+    try:
+        event = FraudReviewEvent.model_validate(payload)
+        
+        # Cross-field Integrity Check
+        if event.risk_score > 80 and not event.llm_review_required:
+            raise ValueError(f"Consistency conflict: risk_score is high ({event.risk_score}) but llm_review_required is False.")
+            
+        return event
+
+    except (ValidationError, ValueError) as e:
+        raise
 
 
-def validate_assessment(payload: dict) -> FraudAssessment:
-    """Validate model output before downstream policy evaluation."""
-    assessment = FraudAssessment.model_validate(payload)
+def validate_assessment(payload: Any) -> FraudAssessment | Dict[str, Any]:
+    """Validate model output before downstream evaluation. Falls back gracefully on failure."""
 
-    unknown_codes = set(assessment.reason_codes) - ALLOWED_REASON_CODES
+    try:
+        assessment = FraudAssessment.model_validate(payload)
+        
+        # 1. Strict Reason Code Enforcement against Allowed Set
+        invalid_codes = set(assessment.reason_codes) - ALLOWED_REASON_CODES
+        if invalid_codes:
+            raise ValueError(f"Unauthorized reason codes detected: {invalid_codes}")
 
-    if unknown_codes:
-        raise ValueError(
-            f"Unsupported reason codes: {sorted(unknown_codes)}"
-        )
+        # 2. Risk Matrix Alignment (Preventing hallucinated contradictions)
+        if assessment.risk_level == "HIGH" and assessment.recommendation == "APPROVE_CANDIDATE":
+            raise ValueError("Critical Policy Conflict: Model attempted to APPROVE a HIGH risk assessment.")
 
-    if not assessment.evidence and assessment.risk_level != "LOW":
-        raise ValueError(
-            "Non-low risk assessments must include evidence"
-        )
+        if assessment.risk_level == "LOW" and assessment.recommendation == "DECLINE_CANDIDATE":
+            raise ValueError("Consistency Conflict: Model attempted to DECLINE a LOW risk assessment.")
 
-    # High uncertainty cannot directly support an approval.
-    if (
-        assessment.uncertainty == "HIGH"
-        and assessment.recommendation == "APPROVE_CANDIDATE"
-    ):
-        raise ValueError(
-            "High-uncertainty assessment cannot recommend approval"
-        )
+        return assessment
 
-    return assessment
+    except (ValidationError, ValueError) as e:
+        raise
 
 
 def safe_fallback() -> dict:

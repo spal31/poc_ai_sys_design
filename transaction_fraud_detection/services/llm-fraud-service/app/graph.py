@@ -3,18 +3,19 @@ import json
 from typing import TypedDict
 
 from langgraph.graph import StateGraph, START, END
-from langfuse.langchain import CallbackHandler
+from langfuse import Langfuse, get_client
+from langfuse.langchain import CallbackHandler 
 
-from app.schemas import FraudAssessment, FraudReviewEvent
-from app.guardrails import (
+from schemas import FraudAssessment
+from guardrails import (
     validate_review_event,
     validate_assessment,
     safe_fallback,
 )
-from app.agent import build_agent
+from agent import build_agent
 
 import shared.config as CONFIG
-
+import traceback
 
 class FraudGraphState(TypedDict, total=False):
     event: dict
@@ -45,27 +46,55 @@ def investigate(state: FraudGraphState):
     Retrieve additional context when useful.
     Return a structured assessment based only on available evidence.
     """
-
     try:
-        callbacks = [CallbackHandler()] if (
-            CONFIG.LANGFUSE_PUBLIC_KEY
-            and CONFIG.LANGFUSE_SECRET_KEY
-        ) else []
+        # 1. Initialize the global Langfuse client once safely 
+        if CONFIG.LANGFUSE_PUBLIC_KEY and CONFIG.LANGFUSE_SECRET_KEY:
+            Langfuse(
+                public_key=CONFIG.LANGFUSE_PUBLIC_KEY,
+                secret_key=CONFIG.LANGFUSE_SECRET_KEY,
+                host=CONFIG.LANGFUSE_BASE_URL
+            )
+            # 2. Get the handler out of the configured global client singleton
+            callbacks = [CallbackHandler()]
+        else:
+            callbacks = []
+        try:
+            response = agent.invoke(
+                {"messages": [{"role": "user", "content": prompt}]},
+                config={
+                    "callbacks": callbacks,
+                    "recursion_limit": int(CONFIG.MAX_AGENT_STEPS),
+                    "configurable": {
+                        "response_format": FraudAssessment 
+                    },
+                    "metadata": {
+                        "service": "llm-fraud-service",
+                        "workflow_version": "v1"
+                    },
 
-        response = agent.invoke(
-            {"messages": [{"role": "user", "content": prompt}]},
-            config={
-                "callbacks": callbacks,
-                "recursion_limit": CONFIG.MAX_AGENT_STEPS,
-                "metadata": {
-                    "service": "llm-fraud-service",
-                    "workflow_version": "v1",
                 },
-            },
-        )
-
+            )
+        except Exception:
+            traceback.print_exc() 
+          
         # Requires response_format=FraudAssessment on the agent.
-        assessment = response.get("structured_response")
+        if response and "messages" in response:
+            final_message = response["messages"][-1]
+            raw_content = final_message.content
+            # 2. Parse the text contents into a dictionary
+            try:
+                # If wrapped under a root class name key by the LLM
+                parsed_json = json.loads(raw_content)
+                if "FraudAssessment" in parsed_json:
+                    assessment = parsed_json["FraudAssessment"]
+                else:
+                    assessment = parsed_json
+            except (json.JSONDecodeError, TypeError):
+                # Fallback in case of raw tool call representations
+                assessment = getattr(final_message, "tool_calls", None)
+        else:
+            assessment = None
+            print("Error: The agent state returned empty or missing 'messages'.")
 
         if assessment is None:
             raise ValueError("Agent did not return structured output")

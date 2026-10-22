@@ -4,9 +4,9 @@ from redis_llm_state import RedisCustomerContext
 store = RedisCustomerContext()
 
 store.save_customer_profile(
-    "CUST-101",
+    "CUST-1",
     {
-        "customer_id": "CUST-101",
+        "customer_id": "CUST-1",
         "last_login_before_days": 2,
         "home_country": "IN",
         "usual_average_transaction_amount": 2500,
@@ -16,9 +16,9 @@ store.save_customer_profile(
 )
 
 store.save_customer_profile(
-    "CUST-102",
+    "CUST-2",
     {
-        "customer_id": "CUST-102",
+        "customer_id": "CUST-2",
         "last_login_before_days": 2000,
         "home_country": "CA",
         "usual_average_transaction_amount": 500,
@@ -28,9 +28,9 @@ store.save_customer_profile(
 )
 
 store.save_customer_profile(
-    "CUST-103",
+    "CUST-3",
     {
-        "customer_id": "CUST-103",
+        "customer_id": "CUST-3",
         "last_login_before_days": 5,
         "home_country": "US",
         "usual_average_transaction_amount": 4000,
@@ -40,9 +40,9 @@ store.save_customer_profile(
 )
 
 store.save_customer_profile(
-    "CUST-104",
+    "CUST-4",
     {
-        "customer_id": "CUST-104",
+        "customer_id": "CUST-4",
         "last_login_before_days": 7,
         "home_country": "UK",
         "usual_average_transaction_amount": 5000,
@@ -52,9 +52,9 @@ store.save_customer_profile(
 )
 
 store.save_customer_profile(
-    "CUST-105",
+    "CUST-5",
     {
-        "customer_id": "CUST-105",
+        "customer_id": "CUST-5",
         "last_login_before_days": 3,
         "home_country": "IN",
         "usual_average_transaction_amount": 6000,

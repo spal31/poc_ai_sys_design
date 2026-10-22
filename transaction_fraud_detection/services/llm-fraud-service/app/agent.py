@@ -8,11 +8,12 @@ from langchain_openai import ChatOpenAI
 
 import shared.config as CONFIG
 
-from app.tools import (
+from tools import (
     get_customer_profile,
     get_transaction_context,
 )
 
+from schemas import FraudAssessment
 
 # Exclude general filesystem and shell tools from this agent.
 # The agent only needs the explicitly registered business tools.
@@ -57,9 +58,10 @@ model = ChatOpenAI(
     model=CONFIG.OPENAI_MODEL,
     api_key=CONFIG.OPENAI_API_KEY,
     temperature=0,
-    timeout=20,
-    max_retries=CONFIG.MAX_LLM_RETRIES,
+    timeout=60,
+    max_retries=int(CONFIG.MAX_LLM_RETRIES),
 )
+
 
 
 def build_agent():
@@ -70,4 +72,5 @@ def build_agent():
             get_customer_profile,
         ],
         system_prompt=SYSTEM_PROMPT,
+        response_format=FraudAssessment
     )

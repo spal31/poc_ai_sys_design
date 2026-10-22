@@ -23,7 +23,7 @@ from shared.config import (
     LLM_REVIEW_TOPIC
 )
 
-from llm_router import LLMRoutingResult
+from llm_router import should_route_to_llm
 
 import logging 
 
@@ -103,9 +103,7 @@ class FraudService:
             if rule.triggered
         ]
 
-        # Check if further LLM review required
-        llm_routing_result = LLMRoutingResult()
-        routing = llm_routing_result.should_route_to_llm(
+        routing = should_route_to_llm(
                     risk_score=risk_score,
                     triggered_rules=triggered_rules )
         
@@ -117,7 +115,8 @@ class FraudService:
                     "triggered_rules": triggered_rules,
                     "llm_review_required": routing.required,
                     "llm_routing_reason": routing.reason,
-                    "customer_id": payment["customer_id"]
+                    "customer_id": payment["customer_id"],
+                    "amount": float(payment["amount"])
             }
 
             self.producer.send(

@@ -14,6 +14,8 @@ from shared.events.audit_event import (
 
 from shared.logging_config import configure_logging
 
+from shared.redis_state.redis_llm_state import RedisCustomerContext
+
 configure_logging("payment-service")
 logger = logging.getLogger("payment")
 
@@ -41,6 +43,8 @@ class PaymentService:
 
             acks="all",
         )
+
+        self.redis_context = RedisCustomerContext()
 
     def publish_payment_result(self, payment: dict, success: bool):
     
@@ -76,15 +80,13 @@ class PaymentService:
 
     def process(self, payment: dict):
 
-       payment_id = payment.get("payment_id")
-       correlation_id = payment.get("correlation_id")
+       payment_id = payment.get("transaction_id")
        
        logger.info(
                "Processing payment",
                extra={
                    "event": "payment_processing_started",
                    "payment_id": payment_id,
-                   "correlation_id": correlation_id,
                },
               )
        try: 
@@ -92,6 +94,8 @@ class PaymentService:
             validation.validate(payment)
             
             self.publish_payment_result(payment, True)
+
+            self.redis_context.add_transaction(payment.get("customer_id"), payment)
 
        except Exception as exc:
 
