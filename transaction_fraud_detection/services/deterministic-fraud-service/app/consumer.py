@@ -51,14 +51,12 @@ class FraudConsumer:
                     try:
                         
                         payment = msg.value
-                        payment_id = payment.get("payment_id")
-                        correlation_id = payment.get("correlation_id")
+                        payment_id = payment.get("transaction_id")
                         
                         logger.info(f"Processing transaction {payment.get('transaction_id')}",
                                                        extra={
                                                            "event": "fraud_checking",
                                                            "payment_id": payment_id,
-                                                           "correlation_id": correlation_id,
                                                        },
                                                       )
 
@@ -66,12 +64,10 @@ class FraudConsumer:
                             lambda: self.fraud_service.process(payment)
                         )
 
-                        print(f"Fraud processing successful: {result}")
                         logger.info(f"Fraud processing successful: {result}",
                                                 extra={
                                                     "event": "fraud_checking",
-                                                    "payment_id": payment_id,
-                                                    "correlation_id": correlation_id,
+                                                    "payment_id": payment_id
                                                 },
                                                 )
 
@@ -81,7 +77,6 @@ class FraudConsumer:
                     except Exception as exc:
                         logger.exception(f"Unexpected error: {exc}",
                                                              extra={ "event": "fraud_checking",
-                                                                      "payment_id": payment_id,
-                                                                       "correlation_id": correlation_id,})
+                                                                      "payment_id": payment_id,})
                         self.consumer.commit()
 
